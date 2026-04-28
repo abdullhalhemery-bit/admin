@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/approvals.js": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]

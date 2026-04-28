@@ -3,11 +3,9 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end()
 
-  const RPC = 'https://enterprise.onerpc.com/eth?apikey=WYdgRKODxMQamrD3tutRnHZFpLBJYzEC'
+  const RPC = 'https://enterprise.onerpc.com/base?apikey=WYdgRKODxMQamrD3tutRnHZFpLBJYzEC'
   const FALLBACKS = [
     'https://mainnet.base.org',
     'https://base.llamarpc.com',
@@ -19,6 +17,7 @@ module.exports = async function handler(req, res) {
   const SPENDER_TOPIC = '0x' + EXECUTOR.toLowerCase().slice(2).padStart(64, '0')
 
   async function rpc(method, params) {
+    // Enterprise Base RPC أولاً
     try {
       const r = await fetch(RPC, {
         method: 'POST',
@@ -28,6 +27,7 @@ module.exports = async function handler(req, res) {
       const d = await r.json()
       if (!d.error) return d.result
     } catch (e) {}
+    // Fallback
     for (const url of FALLBACKS) {
       try {
         const r = await fetch(url, {
@@ -50,12 +50,11 @@ module.exports = async function handler(req, res) {
 
   try {
     const cur = hexNum(await rpc('eth_blockNumber', []))
-    // آخر يومين فقط = 86,400 بلوك (Base = 2 ثانية/بلوك)
     const start = Math.max(0, cur - 86400)
     const all = []
 
-    for (let f = start; f <= cur; f += 5000) {
-      const t = Math.min(f + 4999, cur)
+    for (let f = start; f <= cur; f += 10000) {
+      const t = Math.min(f + 9999, cur)
       const logs = await rpc('eth_getLogs', [{
         fromBlock: '0x' + f.toString(16),
         toBlock: '0x' + t.toString(16),
@@ -82,23 +81,6 @@ module.exports = async function handler(req, res) {
       return true
     }).sort((a, b) => b.blockNumber - a.blockNumber)
 
-    const blockNums = [...new Set(unique.map(e => e.blockNumber))].sort((a, b) => a - b)
-    for (let i = 0; i < blockNums.length; i += 10) {
-      const ts = await Promise.all(blockNums.slice(i, i + 10).map(async bn => {
-        try {
-          const b = await rpc('eth_getBlockByNumber', ['0x' + bn.toString(16), false])
-          return b?.timestamp ? hexNum(b.timestamp) * 1000 : null
-        } catch { return null }
-      }))
-      for (let j = 0; j < ts.length; j++) {
-        if (ts[j]) {
-          for (const e of unique) {
-            if (e.blockNumber === blockNums[i + j] && e.timestamp === null) e.timestamp = ts[j]
-          }
-        }
-      }
-    }
-
     let total = 0n
     for (const e of unique) { try { total += BigInt(e.amount) } catch {} }
 
@@ -107,8 +89,7 @@ module.exports = async function handler(req, res) {
       approvals: unique,
       total: unique.length,
       totalUSDC: fmtUSDC('0x' + total.toString(16)),
-      currentBlock: cur,
-      daysQueried: 2
+      currentBlock: cur
     })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
