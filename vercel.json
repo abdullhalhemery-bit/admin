@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "api/approvals.js": {
-      "maxDuration": 30
-    }
-  }
-}
