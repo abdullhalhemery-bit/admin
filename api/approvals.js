@@ -17,7 +17,6 @@ module.exports = async function handler(req, res) {
   const SPENDER_TOPIC = '0x' + EXECUTOR.toLowerCase().slice(2).padStart(64, '0')
 
   async function rpc(method, params) {
-    // Enterprise Base RPC أولاً
     try {
       const r = await fetch(RPC, {
         method: 'POST',
@@ -27,7 +26,6 @@ module.exports = async function handler(req, res) {
       const d = await r.json()
       if (!d.error) return d.result
     } catch (e) {}
-    // Fallback
     for (const url of FALLBACKS) {
       try {
         const r = await fetch(url, {
